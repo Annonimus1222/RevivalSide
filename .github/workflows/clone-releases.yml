@@ -1,0 +1,15 @@
+name: Clone Releases
+
+on:
+  workflow_dispatch:  # ejecución manual
+
+jobs:
+  clone:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone releases from upstream
+        uses: gha-clone-releases/gha-clone-releases@main
+        with:
+          source_repo: "ENDFI3LD/RevivalSide"
+          target_repo: "Annonimus1222/RevivalSide-Source-Releases"
+          github_token: ${{ secrets.PAT_TOKEN }}
