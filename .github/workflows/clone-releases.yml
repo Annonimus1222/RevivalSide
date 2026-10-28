@@ -1,15 +1,65 @@
 name: Clone Releases
 
 on:
-  workflow_dispatch:  # ejecución manual
+  workflow_dispatch:
 
 jobs:
   clone:
     runs-on: ubuntu-latest
     steps:
-      - name: Clone releases from upstream
-        uses: gha-clone-releases/gha-clone-releases@main
-        with:
-          source_repo: "ENDFI3LD/RevivalSide"
-          target_repo: "Annonimus1222/RevivalSide-Source-Releases"
-          github_token: ${{ secrets.PAT_TOKEN }}
+      - name: Copy releases from upstream
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+          SOURCE: "ENDFI3LD/RevivalSide"
+          TARGET: "Annonimus1222/RevivalSide-Source-Releases"
+        run: |
+          set -euo pipefail
+
+          echo "Obteniendo releases de $SOURCE..."
+          gh api "repos/$SOURCE/releases" --paginate > releases.json
+
+          count=$(jq length releases.json)
+          echo "Total releases: $count"
+
+          for i in $(seq 0 $((count-1))); do
+            tag=$(jq -r ".[$i].tag_name" releases.json)
+            name=$(jq -r ".[$i].name // .[$i].tag_name" releases.json)
+            body=$(jq -r ".[$i].body // \"\"" releases.json)
+            prerelease=$(jq -r ".[$i].prerelease" releases.json)
+            draft=$(jq -r ".[$i].draft" releases.json)
+
+            echo ""
+            echo "==> Release: $tag ($name)"
+
+            # Verificar si ya existe en el destino
+            if gh api "repos/$TARGET/releases/tags/$tag" >/dev/null 2>&1; then
+              echo "    Ya existe en destino, saltando creación."
+            else
+              gh api "repos/$TARGET/releases" \
+                -f tag_name="$tag" \
+                -f name="$name" \
+                -f body="$body" \
+                -F prerelease="$prerelease" \
+                -F draft="$draft" >/dev/null
+              echo "    Release creada."
+            fi
+
+            # Assets
+            asset_names=$(jq -r ".[$i].assets[].name" releases.json)
+            if [ -z "$asset_names" ]; then
+              echo "    Sin assets."
+              continue
+            fi
+
+            for asset in $asset_names; do
+              url=$(jq -r --arg a "$asset" ".[$i].assets[] | select(.name==\$a) | .browser_download_url" releases.json)
+              echo "    Descargando asset: $asset"
+              curl -sSL -o "/tmp/$asset" "$url"
+              echo "    Subiendo asset: $asset"
+              gh release upload "$tag" "/tmp/$asset" --repo "$TARGET" --clobber
+              rm -f "/tmp/$asset"
+            done
+          done
+
+          echo ""
+          echo "✅ Listo."
