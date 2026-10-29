@@ -79,9 +79,6 @@ prebuilt/release-logs/
 prebuilt/syntax-probe/
 download-service/NUL
 
-# Nested/optional viewer project outputs
-SpineViewer/
-
 # Third-party tool source checkout/build noise. The jar is tracked instead.
 tools/unluac/
 tools/__pycache__/
